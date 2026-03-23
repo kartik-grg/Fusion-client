@@ -78,7 +78,7 @@ function SidebarContent({ isCollapsed, toggleSidebar }) {
       label: "Visitor's Hostel",
       id: "visitor_hostel",
       icon: <GuestIcon size={18} />,
-      url: "/",
+      url: "/visitor_hostel",
     },
     {
       label: "HealthCare Center",

@@ -6,7 +6,14 @@ import { useDispatch } from "react-redux";
 import { setActiveTab_ } from "../redux/moduleslice";
 import classes from "../Modules/Dashboard/Dashboard.module.css";
 
-function ModuleTabs({ tabs, activeTab, setActiveTab, badges = [] }) {
+function ModuleTabs({
+  tabs,
+  activeTab,
+  setActiveTab,
+  badges = [],
+  containerMaxWidth = "85vw",
+  bottomMargin = "30px",
+}) {
   const tabsListRef = useRef(null);
   const tabsListContainerRef = useRef(null);
   const dispatch = useDispatch();
@@ -50,7 +57,7 @@ function ModuleTabs({ tabs, activeTab, setActiveTab, badges = [] }) {
     <Flex
       justify="space-between"
       align="center"
-      style={{ marginBottom: "30px" }}
+      style={{ marginBottom: bottomMargin, width: "100%" }}
     >
       <Flex
         justify="center"
@@ -71,7 +78,7 @@ function ModuleTabs({ tabs, activeTab, setActiveTab, badges = [] }) {
         <div
           className={classes.fusionTabsContainer}
           ref={tabsListRef}
-          style={{ maxWidth: "85vw" }}
+          style={{ maxWidth: containerMaxWidth }}
         >
           <Tabs
             value={activeTab}
@@ -138,6 +145,8 @@ ModuleTabs.propTypes = {
   activeTab: PropTypes.string.isRequired,
   setActiveTab: PropTypes.func.isRequired,
   badges: PropTypes.arrayOf(PropTypes.number),
+  containerMaxWidth: PropTypes.string,
+  bottomMargin: PropTypes.string,
 };
 
 export default ModuleTabs;
