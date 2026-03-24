@@ -6,10 +6,13 @@ import StatCard from '../ui/StatCard';
 import SearchBar from '../ui/SearchBar';
 import EmptyState from '../ui/EmptyState';
 import SettleBillModal from '../modals/SettleBillModal';
+import RoleRestricted from '../ui/RoleRestricted';
 import { formatDate, formatCurrency, formatCurrencyShort } from '../../utils/helpers';
+import { useVhAccess } from '../../utils/roleAccess';
 
 export default function Billing() {
   const { state, stats } = useApp();
+  const access = useVhAccess();
   const settleModal = useModal();
   const [search, setSearch]     = useState('');
   const [statusFilter, setStatus] = useState('');
@@ -26,6 +29,15 @@ export default function Billing() {
   const totalRevenue = state.bills.filter(b => b.status === 'Paid' || b.status === 'Locked').reduce((s, b) => s + b.total, 0);
   const paidCount    = state.bills.filter(b => b.status === 'Paid' || b.status === 'Locked').length;
   const pendingCount = state.bills.filter(b => b.status === 'Pending' || b.status === 'Generated').length;
+
+  if (!access.canViewBilling) {
+    return (
+      <RoleRestricted
+        title="Billing Access Restricted"
+        message="Only VhIncharge can access bill settlement and billing operations."
+      />
+    );
+  }
 
   return (
     <div>
@@ -88,7 +100,7 @@ export default function Billing() {
                       <td><Badge status={b.status}>{b.status}</Badge></td>
                       <td><span className="text-sm text-muted">{formatDate(b.date)}</span></td>
                       <td>
-                        {(b.status === 'Pending' || b.status === 'Generated') && (
+                        {access.canSettleBill && (b.status === 'Pending' || b.status === 'Generated') && (
                           <button className="btn btn-sm btn-primary" onClick={() => settleModal.open(b)}>
                             Settle
                           </button>
@@ -106,7 +118,9 @@ export default function Billing() {
         }
       </div>
 
-      <SettleBillModal isOpen={settleModal.isOpen} onClose={settleModal.close} bill={settleModal.data} />
+      {access.canSettleBill && (
+        <SettleBillModal isOpen={settleModal.isOpen} onClose={settleModal.close} bill={settleModal.data} />
+      )}
     </div>
   );
 }

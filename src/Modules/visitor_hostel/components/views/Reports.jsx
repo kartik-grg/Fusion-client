@@ -6,7 +6,9 @@ import {
 import { useApp } from '../../context/AppContext';
 import StatCard from '../ui/StatCard';
 import Badge from '../ui/Badge';
+import RoleRestricted from '../ui/RoleRestricted';
 import { formatDate, formatCurrency, formatCurrencyShort } from '../../utils/helpers';
+import { useVhAccess } from '../../utils/roleAccess';
 
 const CHART_COLORS = ['#3d3991','#0d6b50','#b87213','#1558a0','#d85a30','#73726c'];
 
@@ -30,6 +32,7 @@ const getRecentMonths = (count = 6) => {
 
 export default function Reports() {
   const { state } = useApp();
+  const access = useVhAccess();
   const [from, setFrom] = useState('2024-03-01');
   const [to,   setTo]   = useState('2024-03-31');
   const [statusFilter, setStatus] = useState('');
@@ -80,6 +83,15 @@ export default function Reports() {
       .filter((bill) => ['Paid', 'Locked'].includes(bill.status) && monthKey(bill.date) === key)
       .reduce((sum, bill) => sum + bill.total, 0),
   }));
+
+  if (!access.canViewReports) {
+    return (
+      <RoleRestricted
+        title="Reports Access Restricted"
+        message="Only VhIncharge can access visitor hostel reports and analytics."
+      />
+    );
+  }
 
   return (
     <div>

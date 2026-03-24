@@ -3,15 +3,27 @@ import { useModal } from '../../hooks/useModal';
 import Alert from '../ui/Alert';
 import CheckinModal from '../modals/CheckinModal';
 import CheckoutModal from '../modals/CheckoutModal';
+import RoleRestricted from '../ui/RoleRestricted';
 import { formatDate } from '../../utils/helpers';
+import { useVhAccess } from '../../utils/roleAccess';
 
 export default function CheckInOut() {
   const { state } = useApp();
+  const access = useVhAccess();
   const checkinModal  = useModal();
   const checkoutModal = useModal();
 
   const confirmed  = state.bookings.filter(b => b.status === 'Confirmed');
   const checkedIn  = state.bookings.filter(b => b.status === 'CheckedIn');
+
+  if (!access.canViewCheckInOut) {
+    return (
+      <RoleRestricted
+        title="Check-in / Check-out Access Restricted"
+        message="Only VhCaretaker can process guest arrivals and departures."
+      />
+    );
+  }
 
   return (
     <div>
@@ -122,8 +134,12 @@ export default function CheckInOut() {
         </div>
       </div>
 
-      <CheckinModal  isOpen={checkinModal.isOpen}  onClose={checkinModal.close}  booking={checkinModal.data}  />
-      <CheckoutModal isOpen={checkoutModal.isOpen} onClose={checkoutModal.close} booking={checkoutModal.data} />
+      {access.canCheckinCheckout && (
+        <>
+          <CheckinModal isOpen={checkinModal.isOpen} onClose={checkinModal.close} booking={checkinModal.data} />
+          <CheckoutModal isOpen={checkoutModal.isOpen} onClose={checkoutModal.close} booking={checkoutModal.data} />
+        </>
+      )}
     </div>
   );
 }

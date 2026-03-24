@@ -12,7 +12,9 @@ import ConfirmBookingModal from '../modals/ConfirmBookingModal';
 import CheckinModal from '../modals/CheckinModal';
 import CheckoutModal from '../modals/CheckoutModal';
 import BookingFormModal from '../modals/BookingFormModal';
+import RoleRestricted from '../ui/RoleRestricted';
 import { formatDate, formatDateShort } from '../../utils/helpers';
+import { useVhAccess } from '../../utils/roleAccess';
 
 const TABS = [
   { key:'all',       label:'All' },
@@ -26,6 +28,7 @@ const TABS = [
 
 export default function Bookings() {
   const { state, dispatch, stats } = useApp();
+  const access = useVhAccess();
   const toast  = useToast();
   const loc    = useLocation();
   const confirmModal = useModal();
@@ -60,6 +63,15 @@ export default function Bookings() {
 
   const categories = [...new Set(state.bookings.map(b => b.category))];
 
+  if (!access.canViewBookings) {
+    return (
+      <RoleRestricted
+        title="Bookings Access Restricted"
+        message="This section is available only to VhIncharge and VhCaretaker roles."
+      />
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-20">
@@ -67,7 +79,9 @@ export default function Bookings() {
           <h1 className="page-title">Bookings</h1>
           <p className="page-sub">Manage all booking requests and status transitions</p>
         </div>
-        <button className="btn btn-primary" onClick={newModal.open}>+ New Booking</button>
+        {access.canCreateBooking && (
+          <button className="btn btn-primary" onClick={newModal.open}>+ New Booking</button>
+        )}
       </div>
 
       <Tabs tabs={tabsWithCount} active={tab} onChange={setTab} />
@@ -107,9 +121,26 @@ export default function Bookings() {
                       onConfirm={() => confirmModal.open(b)}
                       onCheckin={() => checkinModal.open(b)}
                       onCheckout={() => checkoutModal.open(b)}
-                      onForward={() => { dispatch({ type:'FORWARD_BOOKING', id:b.id }); toast.success(`${b.id} forwarded to VH In-Charge`); }}
-                      onReject={() => { dispatch({ type:'REJECT_BOOKING', id:b.id }); toast.info(`${b.id} rejected`); }}
-                      onCancel={() => { dispatch({ type:'CANCEL_BOOKING', id:b.id }); toast.warn(`${b.id} cancelled`); }}
+                      canForward={access.canForwardBooking}
+                      canCancel={access.canCancelBooking}
+                      canApprove={access.canApproveBooking}
+                      canReject={access.canRejectBooking}
+                      canCheckinCheckout={access.canCheckinCheckout}
+                      onForward={() => {
+                        if (!access.canForwardBooking) return;
+                        dispatch({ type:'FORWARD_BOOKING', id:b.id });
+                        toast.success(`${b.id} forwarded to VH In-Charge`);
+                      }}
+                      onReject={() => {
+                        if (!access.canRejectBooking) return;
+                        dispatch({ type:'REJECT_BOOKING', id:b.id });
+                        toast.info(`${b.id} rejected`);
+                      }}
+                      onCancel={() => {
+                        if (!access.canCancelBooking) return;
+                        dispatch({ type:'CANCEL_BOOKING', id:b.id });
+                        toast.warn(`${b.id} cancelled`);
+                      }}
                     />
                   ))}
                 </tbody>
@@ -119,15 +150,36 @@ export default function Bookings() {
         }
       </div>
 
-      <BookingFormModal  isOpen={newModal.isOpen}      onClose={newModal.close} />
-      <ConfirmBookingModal isOpen={confirmModal.isOpen} onClose={confirmModal.close} booking={confirmModal.data} />
-      <CheckinModal       isOpen={checkinModal.isOpen}  onClose={checkinModal.close}  booking={checkinModal.data} />
-      <CheckoutModal      isOpen={checkoutModal.isOpen} onClose={checkoutModal.close} booking={checkoutModal.data} />
+      {access.canCreateBooking && (
+        <BookingFormModal isOpen={newModal.isOpen} onClose={newModal.close} />
+      )}
+      {access.canApproveBooking && (
+        <ConfirmBookingModal isOpen={confirmModal.isOpen} onClose={confirmModal.close} booking={confirmModal.data} />
+      )}
+      {access.canCheckinCheckout && (
+        <>
+          <CheckinModal isOpen={checkinModal.isOpen} onClose={checkinModal.close} booking={checkinModal.data} />
+          <CheckoutModal isOpen={checkoutModal.isOpen} onClose={checkoutModal.close} booking={checkoutModal.data} />
+        </>
+      )}
     </div>
   );
 }
 
-function BookingRow({ booking: b, onConfirm, onCheckin, onCheckout, onForward, onReject, onCancel }) {
+function BookingRow({
+  booking: b,
+  onConfirm,
+  onCheckin,
+  onCheckout,
+  onForward,
+  onReject,
+  onCancel,
+  canForward,
+  canCancel,
+  canApprove,
+  canReject,
+  canCheckinCheckout,
+}) {
   return (
     <tr>
       <td><div className="td-mono">{b.id}</div></td>
@@ -148,21 +200,27 @@ function BookingRow({ booking: b, onConfirm, onCheckin, onCheckout, onForward, o
         <div className="flex gap-4">
           {b.status === 'Pending' && (
             <>
-              <button className="btn btn-sm" onClick={onForward}>Forward</button>
-              <button className="btn btn-sm btn-danger" onClick={onCancel}>Cancel</button>
+              {canForward && <button className="btn btn-sm" onClick={onForward}>Forward</button>}
+              {canCancel && <button className="btn btn-sm btn-danger" onClick={onCancel}>Cancel</button>}
+              {!canForward && !canCancel && <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
             </>
           )}
           {b.status === 'Forwarded' && (
             <>
-              <button className="btn btn-sm btn-success" onClick={onConfirm}>Confirm</button>
-              <button className="btn btn-sm btn-danger" onClick={onReject}>Reject</button>
+              {canApprove && <button className="btn btn-sm btn-success" onClick={onConfirm}>Confirm</button>}
+              {canReject && <button className="btn btn-sm btn-danger" onClick={onReject}>Reject</button>}
+              {!canApprove && !canReject && <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
             </>
           )}
           {b.status === 'Confirmed' && (
-            <button className="btn btn-sm btn-success" onClick={onCheckin}>Check In</button>
+            canCheckinCheckout
+              ? <button className="btn btn-sm btn-success" onClick={onCheckin}>Check In</button>
+              : <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>
           )}
           {b.status === 'CheckedIn' && (
-            <button className="btn btn-sm" onClick={onCheckout}>Check Out</button>
+            canCheckinCheckout
+              ? <button className="btn btn-sm" onClick={onCheckout}>Check Out</button>
+              : <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>
           )}
           {(b.status === 'CheckedOut' || b.status === 'Cancelled' || b.status === 'Rejected') && (
             <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>

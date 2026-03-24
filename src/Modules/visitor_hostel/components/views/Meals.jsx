@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../hooks/useToast';
 import Alert from '../ui/Alert';
+import RoleRestricted from '../ui/RoleRestricted';
 import { todayISO, formatDate, formatCurrency } from '../../utils/helpers';
 import { MEAL_TYPES } from '../../data/constants';
+import { useVhAccess } from '../../utils/roleAccess';
 
 export default function Meals() {
   const { state, dispatch } = useApp();
+  const access = useVhAccess();
   const toast = useToast();
 
   const checkedIn = state.bookings.filter(b => b.status === 'CheckedIn');
@@ -58,6 +61,15 @@ export default function Meals() {
 
   const mealTypeColor = { Breakfast:'var(--warn-light)', Lunch:'var(--success-light)', Dinner:'var(--info-light)', 'High Tea':'var(--brand-light)' };
   const mealTypeText  = { Breakfast:'var(--warn)', Lunch:'var(--success)', Dinner:'var(--info)', 'High Tea':'var(--brand)' };
+
+  if (!access.canViewMeals) {
+    return (
+      <RoleRestricted
+        title="Meals Access Restricted"
+        message="Only VhCaretaker can record and manage meal entries."
+      />
+    );
+  }
 
   return (
     <div>
@@ -120,7 +132,7 @@ export default function Meals() {
               <span className="text-sm text-muted">Total Amount</span>
               <span style={{ fontFamily:'var(--font-display)', fontSize:18 }}>{formatCurrency(total)}</span>
             </div>
-            <button className="btn btn-primary" onClick={submit} disabled={checkedIn.length === 0}>
+            <button className="btn btn-primary" onClick={submit} disabled={checkedIn.length === 0 || !access.canRecordMeals}>
               Record Meal
             </button>
           </div>

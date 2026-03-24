@@ -1,31 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Flex } from '@mantine/core';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import CustomBreadcrumbs from '../../../../components/Breadcrumbs';
 import ModuleTabs from '../../../../components/moduleTabs';
 import ToastContainer from '../ui/Toast';
-
-const SECTION_TABS = [
-  { title: 'Dashboard', path: '/visitor_hostel' },
-  { title: 'Bookings', path: '/visitor_hostel/bookings' },
-  { title: 'Rooms', path: '/visitor_hostel/rooms' },
-  { title: 'Check-In / Check-Out', path: '/visitor_hostel/checkin' },
-  { title: 'Billing', path: '/visitor_hostel/billing' },
-  { title: 'Meals', path: '/visitor_hostel/meals' },
-  { title: 'Inventory', path: '/visitor_hostel/inventory' },
-  { title: 'Reports', path: '/visitor_hostel/reports' },
-];
+import RoleRestricted from '../ui/RoleRestricted';
+import { getAllowedSectionTabs, useVhAccess } from '../../utils/roleAccess';
 
 export default function Layout() {
+  const access = useVhAccess();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('0');
   const normalizedPath = pathname.replace(/\/$/, '') || '/visitor_hostel';
+  const sectionTabs = useMemo(() => getAllowedSectionTabs(access), [access]);
 
   useEffect(() => {
-    const foundIndex = SECTION_TABS.findIndex(({ path }) => path === normalizedPath);
-    setActiveTab(foundIndex >= 0 ? String(foundIndex) : '0');
-  }, [normalizedPath]);
+    if (!access.hasAccess) {
+      return;
+    }
+
+    const foundIndex = sectionTabs.findIndex(({ path }) => path === normalizedPath);
+    if (foundIndex >= 0) {
+      setActiveTab(String(foundIndex));
+      return;
+    }
+
+    if (sectionTabs.length > 0) {
+      navigate(sectionTabs[0].path, { replace: true });
+    }
+  }, [access.hasAccess, navigate, normalizedPath, sectionTabs]);
 
   const handleTabChange = (tabIndex) => {
     if (tabIndex === null) {
@@ -33,7 +37,7 @@ export default function Layout() {
     }
 
     setActiveTab(tabIndex);
-    const tabConfig = SECTION_TABS[parseInt(tabIndex, 10)];
+    const tabConfig = sectionTabs[parseInt(tabIndex, 10)];
     if (tabConfig && tabConfig.path !== normalizedPath) {
       navigate(tabConfig.path);
     }
@@ -44,15 +48,24 @@ export default function Layout() {
       <div className="vh-page-shell">
         <CustomBreadcrumbs />
         <Flex justify="space-between" align="center" mt="lg">
-          <ModuleTabs
-            tabs={SECTION_TABS}
-            activeTab={activeTab}
-            setActiveTab={handleTabChange}
-          />
+          {sectionTabs.length > 0 && (
+            <ModuleTabs
+              tabs={sectionTabs}
+              activeTab={activeTab}
+              setActiveTab={handleTabChange}
+            />
+          )}
         </Flex>
 
         <main className="vh-content-wrap">
-          <Outlet />
+          {access.hasAccess ? (
+            <Outlet />
+          ) : (
+            <RoleRestricted
+              title="Visitor Hostel Access Restricted"
+              message="Only VhIncharge and VhCaretaker roles can access Visitor Hostel features."
+            />
+          )}
         </main>
       </div>
       <ToastContainer />

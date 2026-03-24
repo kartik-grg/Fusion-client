@@ -4,9 +4,12 @@ import { useToast } from '../../hooks/useToast';
 import Badge from '../ui/Badge';
 import StatCard from '../ui/StatCard';
 import Alert from '../ui/Alert';
+import RoleRestricted from '../ui/RoleRestricted';
+import { useVhAccess } from '../../utils/roleAccess';
 
 export default function Rooms() {
   const { state, dispatch } = useApp();
+  const access = useVhAccess();
   const toast = useToast();
   const [typeFilter, setTypeFilter]   = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -37,9 +40,21 @@ export default function Rooms() {
     setSelectedAvail(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
   const changeRoomStatus = (id, newStatus) => {
+    if (!access.canManageRoomStatus) {
+      return;
+    }
     dispatch({ type: 'UPDATE_ROOM_STATUS', id, status: newStatus });
     toast.success(`Room status updated to ${newStatus}`);
   };
+
+  if (!access.canViewRooms) {
+    return (
+      <RoleRestricted
+        title="Rooms Access Restricted"
+        message="This section is available only to VhIncharge and VhCaretaker roles."
+      />
+    );
+  }
 
   return (
     <div>
@@ -90,7 +105,7 @@ export default function Rooms() {
                     <Badge status={r.status}>{r.status}</Badge>
                   </div>
                   <div className="room-tariff-lbl">₹{r.tariff}/night</div>
-                  {r.status !== 'Occupied' && (
+                  {r.status !== 'Occupied' && access.canManageRoomStatus && (
                     <select
                       className="inline-select room-status-select"
                       value={r.status}

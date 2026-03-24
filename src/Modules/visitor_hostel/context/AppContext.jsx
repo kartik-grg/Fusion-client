@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { api } from '../api/client';
+import { getVhAccessFromRole } from '../utils/roleAccess';
 
 const categoryApiToUi = {
   IIIT_Faculty: 'IIIT Faculty',
@@ -343,6 +345,8 @@ function reducer(state, action) {
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
+  const role = useSelector((state) => state.user.role);
+  const access = getVhAccessFromRole(role);
   const [state, baseDispatch] = useReducer(reducer, initialState);
 
   const toast = useCallback((message, type = 'success') => {
@@ -354,12 +358,14 @@ export function AppProvider({ children }) {
   const loadServerData = useCallback(async () => {
     baseDispatch({ type: 'SET_LOADING', payload: true });
     try {
+      const canLoadOperationalData = access.isVhIncharge || access.isVhCaretaker;
+
       const [bookingsRaw, roomsRaw, billsRaw, inventoryRaw, notificationsRaw] = await Promise.all([
-        api.getAllBookings(),
-        api.getRooms(),
-        api.getBills(),
-        api.getInventory(),
-        api.getNotifications(),
+        canLoadOperationalData ? api.getAllBookings() : api.getBookings(),
+        canLoadOperationalData ? api.getRooms() : Promise.resolve([]),
+        canLoadOperationalData ? api.getBills() : Promise.resolve([]),
+        canLoadOperationalData ? api.getInventory() : Promise.resolve([]),
+        canLoadOperationalData ? api.getNotifications() : Promise.resolve([]),
       ]);
 
       const bookings = (bookingsRaw || []).map(toUIBooking);
@@ -368,17 +374,17 @@ export function AppProvider({ children }) {
         return acc;
       }, {});
 
-      const mealResults = await Promise.all(
-        bookings.map((booking) => api.getMeals(booking.backendId).catch(() => []))
-      );
-
-      const meals = mealResults
-        .flat()
-        .map((meal) => toUIMeal(meal, bookingsByBackendId))
-        .reduce((acc, meal) => {
-          if (!acc.some((m) => m.id === meal.id)) acc.push(meal);
-          return acc;
-        }, []);
+      const meals = canLoadOperationalData
+        ? (await Promise.all(
+            bookings.map((booking) => api.getMeals(booking.backendId).catch(() => []))
+          ))
+            .flat()
+            .map((meal) => toUIMeal(meal, bookingsByBackendId))
+            .reduce((acc, meal) => {
+              if (!acc.some((m) => m.id === meal.id)) acc.push(meal);
+              return acc;
+            }, [])
+        : [];
 
       baseDispatch({
         type: 'SET_SERVER_DATA',
@@ -395,7 +401,7 @@ export function AppProvider({ children }) {
       baseDispatch({ type: 'SET_ERROR', payload: err.message });
       toast(err.message || 'Failed to load Visitor Hostel data.', 'danger');
     }
-  }, [toast]);
+  }, [access.isVhCaretaker, access.isVhIncharge, toast]);
 
   useEffect(() => {
     loadServerData();

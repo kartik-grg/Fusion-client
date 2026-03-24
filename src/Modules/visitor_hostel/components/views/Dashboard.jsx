@@ -4,11 +4,14 @@ import { useModal } from '../../hooks/useModal';
 import { useToast } from '../../hooks/useToast';
 import StatCard from '../ui/StatCard';
 import Badge from '../ui/Badge';
+import RoleRestricted from '../ui/RoleRestricted';
 import { formatDate, formatCurrencyShort } from '../../utils/helpers';
 import ConfirmBookingModal from '../modals/ConfirmBookingModal';
+import { useVhAccess } from '../../utils/roleAccess';
 
 export default function Dashboard() {
   const { state, stats, dispatch } = useApp();
+  const access = useVhAccess();
   const navigate = useNavigate();
   const toast = useToast();
   const confirmModal = useModal();
@@ -16,6 +19,15 @@ export default function Dashboard() {
   const pending   = state.bookings.filter(b => b.status === 'Pending').slice(0, 5);
   const forwarded = state.bookings.filter(b => b.status === 'Forwarded').slice(0, 5);
   const actionable = [...forwarded, ...pending].slice(0, 5);
+
+  if (!access.canViewDashboard) {
+    return (
+      <RoleRestricted
+        title="Visitor Hostel Access Restricted"
+        message="Only VhIncharge and VhCaretaker roles can access this module."
+      />
+    );
+  }
 
   return (
     <div>
@@ -78,7 +90,7 @@ export default function Dashboard() {
                         <td><Badge status={b.status} /></td>
                         <td>
                           <div className="flex gap-4">
-                            {b.status === 'Forwarded' && (
+                            {b.status === 'Forwarded' && access.canApproveBooking && (
                               <>
                                 <button className="btn btn-sm btn-success" onClick={() => confirmModal.open(b)}>Confirm</button>
                                 <button className="btn btn-sm btn-danger" onClick={() => {
@@ -86,10 +98,16 @@ export default function Dashboard() {
                                 }}>Reject</button>
                               </>
                             )}
-                            {b.status === 'Pending' && (
+                            {b.status === 'Pending' && access.canForwardBooking && (
                               <button className="btn btn-sm" onClick={() => {
                                 dispatch({ type: 'FORWARD_BOOKING', id: b.id }); toast.success(`${b.id} forwarded`);
                               }}>Forward</button>
+                            )}
+                            {(b.status === 'Forwarded' && !access.canApproveBooking) && (
+                              <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>
+                            )}
+                            {(b.status === 'Pending' && !access.canForwardBooking) && (
+                              <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>
                             )}
                           </div>
                         </td>
@@ -148,11 +166,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <ConfirmBookingModal
-        isOpen={confirmModal.isOpen}
-        onClose={confirmModal.close}
-        booking={confirmModal.data}
-      />
+      {access.canApproveBooking && (
+        <ConfirmBookingModal
+          isOpen={confirmModal.isOpen}
+          onClose={confirmModal.close}
+          booking={confirmModal.data}
+        />
+      )}
     </div>
   );
 }

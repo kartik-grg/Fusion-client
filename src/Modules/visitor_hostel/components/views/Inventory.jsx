@@ -8,10 +8,13 @@ import Alert from '../ui/Alert';
 import EmptyState from '../ui/EmptyState';
 import SearchBar from '../ui/SearchBar';
 import AddInventoryModal from '../modals/AddInventoryModal';
+import RoleRestricted from '../ui/RoleRestricted';
 import { formatCurrency, formatDate } from '../../utils/helpers';
+import { useVhAccess } from '../../utils/roleAccess';
 
 export default function Inventory() {
   const { state, dispatch } = useApp();
+  const access = useVhAccess();
   const toast = useToast();
   const addModal = useModal();
   const [tab, setTab] = useState('all');
@@ -38,6 +41,9 @@ export default function Inventory() {
   });
 
   const adjustQty = (item, delta) => {
+    if (!access.canManageInventory) {
+      return;
+    }
     const newQty = item.qty + delta;
     if (newQty < 0) { toast.warn('Quantity cannot go below zero'); return; }
     dispatch({
@@ -47,6 +53,15 @@ export default function Inventory() {
     toast.success(delta > 0 ? `Added ${Math.abs(delta)} unit(s) of ${item.name}` : `Used 1 unit of ${item.name}`);
   };
 
+  if (!access.canViewInventory) {
+    return (
+      <RoleRestricted
+        title="Inventory Access Restricted"
+        message="Only VhIncharge can manage hostel inventory."
+      />
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-20">
@@ -54,7 +69,9 @@ export default function Inventory() {
           <h1 className="page-title">Inventory</h1>
           <p className="page-sub">Track and manage hostel inventory stock</p>
         </div>
-        <button className="btn btn-primary" onClick={addModal.open}>+ Add Item</button>
+        {access.canAddInventoryItem && (
+          <button className="btn btn-primary" onClick={addModal.open}>+ Add Item</button>
+        )}
       </div>
 
       {lowItems.length > 0 && (
@@ -127,8 +144,14 @@ export default function Inventory() {
                         <td><span className="text-sm text-muted">{item.billNo || '—'}</span></td>
                         <td>
                           <div className="flex gap-4">
-                            <button className="btn btn-sm" onClick={() => adjustQty(item, 5)}>+5</button>
-                            <button className="btn btn-sm btn-danger" onClick={() => adjustQty(item, -1)}>−1</button>
+                            {access.canManageInventory ? (
+                              <>
+                                <button className="btn btn-sm" onClick={() => adjustQty(item, 5)}>+5</button>
+                                <button className="btn btn-sm btn-danger" onClick={() => adjustQty(item, -1)}>−1</button>
+                              </>
+                            ) : (
+                              <span className="text-sm text-hint">—</span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -141,7 +164,9 @@ export default function Inventory() {
         }
       </div>
 
-      <AddInventoryModal isOpen={addModal.isOpen} onClose={addModal.close} />
+      {access.canAddInventoryItem && (
+        <AddInventoryModal isOpen={addModal.isOpen} onClose={addModal.close} />
+      )}
     </div>
   );
 }
