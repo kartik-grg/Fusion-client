@@ -60,6 +60,8 @@ export const getVhAccessFromRole = (role) => {
     canSettleBill: caretaker,
     canAddInventoryItem: incharge,
     canManageInventory: incharge || caretaker,
+    canRequestInventoryIncrease: caretaker,
+    canReviewInventoryIncreaseRequests: incharge,
     canRecordMeals: caretaker,
     canManageRoomStatus: hasAccess,
   };

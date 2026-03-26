@@ -76,6 +76,11 @@ export const api = {
   getInventory:      ()       => get('/inventory/'),
   addInventory:      (data)   => post('/inventory/add/', data),
   updateInventory:   (data)   => patch('/inventory/update/', data),
+  getReplenishmentRequests: (status) => get(status
+    ? `/inventory/replenishment-requests/?status=${encodeURIComponent(status)}`
+    : '/inventory/replenishment-requests/'),
+  createReplenishmentRequest: (data) => post('/inventory/replenishment-requests/', data),
+  reviewReplenishmentRequest: (data) => post('/inventory/replenishment-requests/review/', data),
   getLowStock:       ()       => get('/inventory/low-stock/'),
 
   // Notifications

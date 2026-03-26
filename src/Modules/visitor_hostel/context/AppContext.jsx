@@ -135,6 +135,20 @@ const toUIInventory = (item) => ({
   description: item.description || '',
 });
 
+const toUIReplenishmentRequest = (req) => ({
+  id: req.id,
+  itemId: req.inventory_item,
+  itemName: req.inventory_item_name || '',
+  requestedBy: req.requested_by_name || '',
+  quantityRequested: toNum(req.quantity_requested),
+  reason: req.reason || '',
+  status: req.status || 'Pending',
+  reviewedBy: req.reviewed_by_name || '',
+  reviewedAt: req.reviewed_at || '',
+  reviewRemark: req.review_remark || '',
+  createdAt: req.created_at || '',
+});
+
 const toUIBill = (bill) => ({
   id: bill.id,
   invoiceNo: bill.invoice_number,
@@ -188,6 +202,7 @@ const initialState = {
   bookings:      [],
   rooms:         [],
   inventory:     [],
+  inventoryRequests: [],
   bills:         [],
   meals:         [],
   notifications: [],
@@ -341,6 +356,7 @@ function reducer(state, action) {
         bookings: action.payload.bookings,
         rooms: action.payload.rooms,
         inventory: action.payload.inventory,
+        inventoryRequests: action.payload.inventoryRequests,
         bills: action.payload.bills,
         meals: action.payload.meals,
         notifications: action.payload.notifications,
@@ -376,11 +392,12 @@ export function AppProvider({ children }) {
     try {
       const canLoadOperationalData = access.isVhIncharge || access.isVhCaretaker;
 
-      const [bookingsRaw, roomsRaw, billsRaw, inventoryRaw, notificationsRaw] = await Promise.all([
+      const [bookingsRaw, roomsRaw, billsRaw, inventoryRaw, requestsRaw, notificationsRaw] = await Promise.all([
         canLoadOperationalData ? api.getAllBookings() : api.getBookings(),
         canLoadOperationalData ? api.getRooms() : Promise.resolve([]),
         canLoadOperationalData ? api.getBills() : Promise.resolve([]),
         canLoadOperationalData ? api.getInventory() : Promise.resolve([]),
+        canLoadOperationalData ? api.getReplenishmentRequests() : Promise.resolve([]),
         canLoadOperationalData ? api.getNotifications() : Promise.resolve([]),
       ]);
 
@@ -408,6 +425,7 @@ export function AppProvider({ children }) {
           bookings,
           rooms: (roomsRaw || []).map(toUIRoom),
           inventory: (inventoryRaw || []).map(toUIInventory),
+          inventoryRequests: (requestsRaw || []).map(toUIReplenishmentRequest),
           bills: (billsRaw || []).map(toUIBill),
           meals,
           notifications: (notificationsRaw || []).map(toUINotification),
@@ -585,10 +603,27 @@ export function AppProvider({ children }) {
           const nextQty = Number(action.payload?.qty ?? current.qty);
           const delta = nextQty - current.qty;
           if (delta === 0) return;
-          await api.updateInventory({ item_id: action.id, quantity_delta: delta });
+          if (delta > 0 && access.isVhCaretaker && !access.isVhIncharge) {
+            await api.createReplenishmentRequest({
+              item_id: action.id,
+              quantity_requested: delta,
+              reason: action.reason || '',
+            });
+          } else {
+            await api.updateInventory({ item_id: action.id, quantity_delta: delta });
+          }
           await loadServerData();
           return;
         }
+
+        case 'REVIEW_REPLENISHMENT_REQUEST':
+          await api.reviewReplenishmentRequest({
+            request_id: action.requestId,
+            approve: Boolean(action.approve),
+            review_remark: action.reviewRemark || '',
+          });
+          await loadServerData();
+          return;
 
         case 'SETTLE_BILL':
           await api.settleBill({

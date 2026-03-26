@@ -50,7 +50,16 @@ export default function Inventory() {
       type: 'UPDATE_INVENTORY_ITEM', id: item.id,
       payload: { qty: newQty, usable: Math.min(item.usable + delta, newQty) },
     });
+    if (delta > 0 && access.isVhCaretaker && !access.isVhIncharge) {
+      toast.success(`Replenishment request sent for ${item.name} (+${Math.abs(delta)})`);
+      return;
+    }
     toast.success(delta > 0 ? `Added ${Math.abs(delta)} unit(s) of ${item.name}` : `Used 1 unit of ${item.name}`);
+  };
+
+  const reviewRequest = (requestId, approve) => {
+    dispatch({ type: 'REVIEW_REPLENISHMENT_REQUEST', requestId, approve });
+    toast.success(approve ? 'Replenishment request approved.' : 'Replenishment request rejected.');
   };
 
   if (!access.canViewInventory) {
@@ -82,6 +91,62 @@ export default function Inventory() {
       )}
 
       <Tabs tabs={tabs} active={tab} onChange={setTab} />
+
+      {(access.canReviewInventoryIncreaseRequests || access.canRequestInventoryIncrease) && (
+        <div className="card mb-16">
+          <div className="card-header">
+            <div>
+              <div className="td-main">Replenishment Requests</div>
+              <div className="td-sub">
+                Caretaker requests inventory increase. VH Incharge approves or rejects.
+              </div>
+            </div>
+            <span className="text-sm text-muted">{(state.inventoryRequests || []).length} total</span>
+          </div>
+
+          {(!state.inventoryRequests || state.inventoryRequests.length === 0) ? (
+            <EmptyState title="No replenishment requests" message="Requests will appear here." />
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Requested Qty</th>
+                    <th>Requested By</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Reviewed By</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(state.inventoryRequests || []).map((req) => (
+                    <tr key={req.id}>
+                      <td>{req.itemName}</td>
+                      <td>+{req.quantityRequested}</td>
+                      <td>{req.requestedBy || '—'}</td>
+                      <td><span className="text-sm text-muted">{req.reason || '—'}</span></td>
+                      <td><Badge status={req.status}>{req.status}</Badge></td>
+                      <td>{req.reviewedBy || '—'}</td>
+                      <td>
+                        {access.canReviewInventoryIncreaseRequests && req.status === 'Pending' ? (
+                          <div className="flex gap-4">
+                            <button className="btn btn-sm" onClick={() => reviewRequest(req.id, true)}>Approve</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => reviewRequest(req.id, false)}>Reject</button>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-hint">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">
@@ -146,7 +211,9 @@ export default function Inventory() {
                           <div className="flex gap-4">
                             {access.canManageInventory ? (
                               <>
-                                <button className="btn btn-sm" onClick={() => adjustQty(item, 5)}>+5</button>
+                                <button className="btn btn-sm" onClick={() => adjustQty(item, 5)}>
+                                  {access.isVhCaretaker && !access.isVhIncharge ? 'Request +5' : '+5'}
+                                </button>
                                 <button className="btn btn-sm btn-danger" onClick={() => adjustQty(item, -1)}>−1</button>
                               </>
                             ) : (
