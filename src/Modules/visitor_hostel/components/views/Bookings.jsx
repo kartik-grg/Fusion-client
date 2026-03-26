@@ -26,6 +26,7 @@ const TABS = [
   { key:'CancellationRequested', label:'Cancellation Requested', badgeType:'warn' },
   { key:'CheckedIn', label:'Checked In' },
   { key:'CheckedOut',label:'Checked Out' },
+  { key:'NoShow',    label:'No Show',    badgeType:'danger' },
   { key:'Cancelled', label:'Cancelled' },
 ];
 
@@ -144,7 +145,7 @@ export default function Bookings() {
                         toast.success(`${b.id} forwarded to VH In-Charge`);
                       }}
                       onReject={() => {
-                        if (!access.canRejectBooking) return;
+                        if (!access.canRejectBooking && !access.canRejectPendingBooking) return;
                         dispatch({ type:'REJECT_BOOKING', id:b.id });
                         toast.info(`${b.id} rejected`);
                       }}
@@ -152,6 +153,15 @@ export default function Bookings() {
                         if (!access.canApproveCancellation) return;
                         dispatch({ type:'APPROVE_CANCELLATION', id:b.id });
                         toast.success(`${b.id} cancellation approved`);
+                      }}
+                      onMarkNoShow={() => {
+                        if (!access.canCheckinCheckout) return;
+                        const confirmed = window.confirm(
+                          `Mark ${b.id} as no-show? Applicable booking charges will still be billed.`
+                        );
+                        if (!confirmed) return;
+                        dispatch({ type:'MARK_NO_SHOW', id:b.id });
+                        toast.info(`${b.id} marked as no-show`);
                       }}
                     />
                   ))}
@@ -209,6 +219,7 @@ function BookingRow({
   onView,
   onRequestCancel,
   onApproveCancellation,
+  onMarkNoShow,
   onForward,
   onReject,
   canForward,
@@ -266,9 +277,12 @@ function BookingRow({
           {b.status === 'Confirmed' && (
             <>
               {canCancel && <button className="btn btn-sm btn-danger" onClick={onRequestCancel}>Request Cancel</button>}
-              {canCheckinCheckout
-                ? <button className="btn btn-sm btn-success" onClick={onCheckin}>Check In</button>
-                : <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
+              {canCheckinCheckout ? (
+                <>
+                  <button className="btn btn-sm btn-success" onClick={onCheckin}>Check In</button>
+                  <button className="btn btn-sm btn-danger" onClick={onMarkNoShow}>No Show</button>
+                </>
+              ) : <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
             </>
           )}
           {b.status === 'CancellationRequested' && (
@@ -281,7 +295,7 @@ function BookingRow({
               ? <button className="btn btn-sm" onClick={onCheckout}>Check Out</button>
               : <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>
           )}
-          {(b.status === 'CheckedOut' || b.status === 'Cancelled' || b.status === 'Rejected') && (
+          {(b.status === 'CheckedOut' || b.status === 'NoShow' || b.status === 'Cancelled' || b.status === 'Rejected') && (
             <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>
           )}
         </div>

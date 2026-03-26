@@ -58,7 +58,7 @@ export default function Reports() {
       confirmed: monthBookings.filter((booking) =>
         ['Confirmed', 'CheckedIn', 'CheckedOut'].includes(booking.status)
       ).length,
-      cancelled: monthBookings.filter((booking) => ['Cancelled', 'Rejected', 'Expired'].includes(booking.status)).length,
+      cancelled: monthBookings.filter((booking) => ['Cancelled', 'Rejected', 'Expired', 'NoShow'].includes(booking.status)).length,
     };
   });
 
@@ -118,7 +118,7 @@ export default function Reports() {
             <label>Booking Status</label>
             <select value={statusFilter} onChange={e => setStatus(e.target.value)}>
               <option value="">All</option>
-              <option>Confirmed</option><option>CheckedOut</option><option>Cancelled</option><option>Rejected</option>
+              <option>Confirmed</option><option>CheckedOut</option><option>NoShow</option><option>Cancelled</option><option>Rejected</option>
             </select>
           </div>
         </div>

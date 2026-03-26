@@ -1,5 +1,6 @@
 import { useApp } from '../../context/AppContext';
 import { useModal } from '../../hooks/useModal';
+import { useToast } from '../../hooks/useToast';
 import Alert from '../ui/Alert';
 import CheckinModal from '../modals/CheckinModal';
 import CheckoutModal from '../modals/CheckoutModal';
@@ -8,8 +9,9 @@ import { formatDate } from '../../utils/helpers';
 import { useVhAccess } from '../../utils/roleAccess';
 
 export default function CheckInOut() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const access = useVhAccess();
+  const toast = useToast();
   const checkinModal  = useModal();
   const checkoutModal = useModal();
 
@@ -72,9 +74,24 @@ export default function CheckInOut() {
                           <div className="td-sub">to {formatDate(b.checkout)}</div>
                         </td>
                         <td>
-                          <button className="btn btn-sm btn-success" onClick={() => checkinModal.open(b)}>
-                            Check In
-                          </button>
+                          <div className="flex gap-4">
+                            <button className="btn btn-sm btn-success" onClick={() => checkinModal.open(b)}>
+                              Check In
+                            </button>
+                            <button
+                              className="btn btn-sm btn-danger"
+                              onClick={() => {
+                                const confirmedAction = window.confirm(
+                                  `Mark ${b.id} as no-show? Applicable booking charges will still be billed.`
+                                );
+                                if (!confirmedAction) return;
+                                dispatch({ type: 'MARK_NO_SHOW', id: b.id });
+                                toast.info(`${b.id} marked as no-show`);
+                              }}
+                            >
+                              No Show
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

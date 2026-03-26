@@ -268,6 +268,14 @@ function reducer(state, action) {
         bills: [...state.bills, action.bill],
       };
     }
+    case 'MARK_NO_SHOW':
+      return {
+        ...state,
+        bookings: state.bookings.map(b =>
+          b.id === action.id ? { ...b, status: 'NoShow' } : b
+        ),
+        rooms: state.rooms.map(r => ({ ...r, status: r.status === 'Occupied' ? 'Available' : r.status })),
+      };
 
     // ROOMS
     case 'UPDATE_ROOM_STATUS':
@@ -540,9 +548,16 @@ export function AppProvider({ children }) {
           await api.checkoutBooking({
             booking_id: getBackendBookingId(action.id),
             extra_charges: Number(action.bill?.extraCharges || 0),
+            overstay_hours: Number(action.bill?.overstayHours || 0),
+            overstay_charges: Number(action.bill?.overstayCharges || 0),
             discount: Number(action.bill?.discount || 0),
             inventory_usage: [],
           });
+          await loadServerData();
+          return;
+
+        case 'MARK_NO_SHOW':
+          await api.markNoShow({ booking_id: getBackendBookingId(action.id) });
           await loadServerData();
           return;
 

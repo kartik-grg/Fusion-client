@@ -56,6 +56,7 @@ export const api = {
   previewCancellation: (data) => post('/bookings/cancel/preview/', data),
   approveCancellation: (data) => post('/bookings/cancel/approve/', data),
   checkinBooking:    (data)   => post('/bookings/check-in/', data),
+  markNoShow:        (data)   => post('/bookings/no-show/', data),
   checkoutBooking:   (data)   => post('/bookings/check-out/', data),
 
   // Rooms

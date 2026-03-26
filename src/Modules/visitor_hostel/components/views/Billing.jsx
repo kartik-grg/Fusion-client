@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { useModal } from '../../hooks/useModal';
 import Badge from '../ui/Badge';
@@ -13,9 +14,14 @@ import { useVhAccess } from '../../utils/roleAccess';
 export default function Billing() {
   const { state, stats } = useApp();
   const access = useVhAccess();
+  const loc = useLocation();
   const settleModal = useModal();
   const [search, setSearch]     = useState('');
   const [statusFilter, setStatus] = useState('');
+
+  useEffect(() => {
+    if (loc.state?.search) setSearch(loc.state.search);
+  }, [loc.state]);
 
   const bills = state.bills.filter(b => {
     if (statusFilter && b.status !== statusFilter) return false;
@@ -34,7 +40,7 @@ export default function Billing() {
     return (
       <RoleRestricted
         title="Billing Access Restricted"
-        message="Only VhIncharge can access bill settlement and billing operations."
+        message="Only VhCaretaker and VhIncharge can access billing operations."
       />
     );
   }

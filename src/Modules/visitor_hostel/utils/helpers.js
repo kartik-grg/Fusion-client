@@ -62,6 +62,7 @@ export const statusBadgeClass = (status) => {
     CancellationRequested: 'badge-forwarded',
     CheckedIn:  'badge-checkedin',
     CheckedOut: 'badge-checkedout',
+    NoShow:     'badge-rejected',
     Cancelled:  'badge-cancelled',
     Rejected:   'badge-rejected',
     Expired:    'badge-expired',
