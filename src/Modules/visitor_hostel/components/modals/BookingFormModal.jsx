@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Modal from '../ui/Modal';
 import Alert from '../ui/Alert';
 import { useApp } from '../../context/AppContext';
@@ -15,12 +15,47 @@ const blank = {
   billedTo:'Intender', projectNo:'', billingAddress:'',
 };
 
-export default function BookingFormModal({ isOpen, onClose }) {
+const toFormFromBooking = (booking) => ({
+  ...blank,
+  visitor: booking?.visitor || '',
+  org: booking?.org || '',
+  category: booking?.category || blank.category,
+  phone: booking?.phone || '',
+  email: booking?.email || '',
+  idType: booking?.idType || blank.idType,
+  idNo: booking?.idNo || '',
+  purpose: booking?.purpose || blank.purpose,
+  checkin: booking?.checkin || '',
+  checkout: booking?.checkout || '',
+  guests: booking?.guests || 1,
+  rooms: booking?.rooms || 1,
+  roomType: booking?.roomType || '',
+  meals: booking?.meals || blank.meals,
+  remark: booking?.remark || '',
+  billedTo: booking?.billedTo || blank.billedTo,
+  projectNo: booking?.projectNo || '',
+  billingAddress: booking?.billingAddress || '',
+});
+
+export default function BookingFormModal({ isOpen, onClose, mode = 'create', initialData = null, onSubmitSuccess }) {
   const { dispatch } = useApp();
   const toast = useToast();
   const [step, setStep]     = useState(0);
   const [form, setForm]     = useState(blank);
   const [error, setError]   = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (mode === 'edit' && initialData) {
+      setForm(toFormFromBooking(initialData));
+      setStep(0);
+      setError('');
+      return;
+    }
+    setForm(blank);
+    setStep(0);
+    setError('');
+  }, [isOpen, mode, initialData]);
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
@@ -44,21 +79,27 @@ export default function BookingFormModal({ isOpen, onClose }) {
     if (err) { setError(err); return; }
     setError('');
     if (step < 3) setStep(s => s + 1);
-    else submit();
+    else void submit();
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (mode === 'edit' && initialData?.id) {
+      await dispatch({ type: 'MODIFY_BOOKING', id: initialData.id, payload: form });
+      toast.success(`Booking ${initialData.id} updated`);
+      if (onSubmitSuccess) onSubmitSuccess();
+      close();
+      return;
+    }
+
     const booking = {
       ...form, id: generateBookingId(), status: 'Pending',
       guests: Number(form.guests), rooms: Number(form.rooms),
       createdAt: todayISO(),
     };
-    dispatch({ type: 'ADD_BOOKING', payload: booking });
+    await dispatch({ type: 'ADD_BOOKING', payload: booking });
     toast.success(`Booking ${booking.id} submitted — awaiting Caretaker review`);
-    onClose();
-    setStep(0);
-    setForm(blank);
-    setError('');
+    if (onSubmitSuccess) onSubmitSuccess();
+    close();
   };
 
   const close = () => { onClose(); setStep(0); setForm(blank); setError(''); };
@@ -68,13 +109,13 @@ export default function BookingFormModal({ isOpen, onClose }) {
       <button className="btn" onClick={close}>Cancel</button>
       {step > 0 && <button className="btn" onClick={() => { setStep(s => s - 1); setError(''); }}>← Back</button>}
       <button className="btn btn-primary" onClick={next}>
-        {step === 3 ? 'Submit Booking' : 'Continue →'}
+        {step === 3 ? (mode === 'edit' ? 'Save Changes' : 'Submit Booking') : 'Continue →'}
       </button>
     </>
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={close} title="New Booking Request" size="lg" footer={footer}>
+    <Modal isOpen={isOpen} onClose={close} title={mode === 'edit' ? 'Edit Booking Request' : 'New Booking Request'} size="lg" footer={footer}>
       <Stepper steps={STEPS} current={step} />
       {error && <Alert type="danger">{error}</Alert>}
 
@@ -183,7 +224,9 @@ export default function BookingFormModal({ isOpen, onClose }) {
           </div>
           <div className="form-group form-full">
             <Alert type="info">
-              Booking will be submitted as <strong>Pending</strong> — the Caretaker will review and forward to VH In-Charge for final confirmation.
+              {mode === 'edit'
+                ? <>Changes will be saved and booking will stay <strong>Pending</strong> for review.</>
+                : <>Booking will be submitted as <strong>Pending</strong> — the Caretaker will review and forward to VH In-Charge for final confirmation.</>}
             </Alert>
           </div>
         </div>

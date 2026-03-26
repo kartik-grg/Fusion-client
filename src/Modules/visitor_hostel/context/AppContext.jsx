@@ -94,10 +94,18 @@ const toUIBooking = (booking) => ({
   purpose: booking.purpose || '',
   phone: booking.visitor_phone || '',
   email: booking.visitor_email || '',
+  idType: booking.id_proof_type || '',
+  idNo: booking.id_proof_number || '',
   intender: booking.intender_name || '',
   billedTo: billedToApiToUi[booking.bill_to_be_settled_by] || booking.bill_to_be_settled_by || '',
+  roomType: booking.preferred_room_type || '',
+  projectNo: booking.project_number || '',
   status: booking.status,
   remark: booking.remark || '',
+  isOffline: booking.is_offline || false,
+  cancellationCharge: toNum(booking.cancellation_charge),
+  cancellationRequestedAt: booking.cancellation_requested_at || '',
+  cancellationReason: booking.cancellation_reason || '',
   rejectionReason: booking.rejection_reason || '',
   roomAllocations: booking.room_allocations || [],
 });
@@ -417,7 +425,36 @@ export function AppProvider({ children }) {
       switch (action.type) {
         case 'ADD_BOOKING': {
           const payload = action.payload || {};
-          await api.createBooking({
+          const bookingData = {
+            visitor_name: payload.visitor || '',
+            visitor_category: categoryUiToApi[payload.category] || 'Other',
+            visitor_phone: payload.phone || '',
+            visitor_email: payload.email || '',
+            visitor_organization: payload.org || '',
+            check_in_date: payload.checkin,
+            check_out_date: payload.checkout,
+            number_of_guests: Number(payload.guests || 1),
+            number_of_rooms: Number(payload.rooms || 1),
+            purpose: purposeUiToApi[payload.purpose] || 'Other',
+            bill_to_be_settled_by: billedToUiToApi[payload.billedTo] || 'Intender',
+            preferred_room_type: payload.roomType || '',
+            purpose_details: payload.remark || '',
+            id_proof_type: payload.idType || '',
+            id_proof_number: payload.idNo || '',
+            project_number: payload.projectNo || '',
+            remark: payload.remark || '',
+          };
+
+          // Backend will automatically detect if caretaker created it and set is_offline=True
+          await api.createBooking(bookingData);
+
+          await loadServerData();
+          return;
+        }
+
+        case 'MODIFY_BOOKING': {
+          const payload = action.payload || {};
+          await api.modifyBooking(getBackendBookingId(action.id), {
             visitor_name: payload.visitor || '',
             visitor_category: categoryUiToApi[payload.category] || 'Other',
             visitor_phone: payload.phone || '',
@@ -455,18 +492,31 @@ export function AppProvider({ children }) {
           return;
 
         case 'REJECT_BOOKING':
-          await api.rejectBooking({
-            booking_id: getBackendBookingId(action.id),
-            reason: action.reason || 'Rejected by user action.',
-          });
+          if (access.isVhCaretaker) {
+            await api.rejectBookingByCaretaker({
+              booking_id: getBackendBookingId(action.id),
+              reason: action.reason || 'Rejected by caretaker action.',
+            });
+          } else {
+            await api.rejectBooking({
+              booking_id: getBackendBookingId(action.id),
+              reason: action.reason || 'Rejected by user action.',
+            });
+          }
           await loadServerData();
           return;
 
+        case 'REQUEST_CANCELLATION':
         case 'CANCEL_BOOKING':
           await api.cancelBooking({
             booking_id: getBackendBookingId(action.id),
             reason: action.reason || 'Cancelled by user action.',
           });
+          await loadServerData();
+          return;
+
+        case 'APPROVE_CANCELLATION':
+          await api.approveCancellation({ booking_id: getBackendBookingId(action.id) });
           await loadServerData();
           return;
 
@@ -575,6 +625,7 @@ export function AppProvider({ children }) {
     totalBookings:    state.bookings.length,
     pendingCount:     state.bookings.filter(b => b.status === 'Pending').length,
     forwardedCount:   state.bookings.filter(b => b.status === 'Forwarded').length,
+    cancellationRequestedCount: state.bookings.filter(b => b.status === 'CancellationRequested').length,
     confirmedCount:   state.bookings.filter(b => b.status === 'Confirmed').length,
     checkedInCount:   state.bookings.filter(b => b.status === 'CheckedIn').length,
     availableRooms:   state.rooms.filter(r => r.status === 'Available').length,

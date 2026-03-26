@@ -12,6 +12,8 @@ import ConfirmBookingModal from '../modals/ConfirmBookingModal';
 import CheckinModal from '../modals/CheckinModal';
 import CheckoutModal from '../modals/CheckoutModal';
 import BookingFormModal from '../modals/BookingFormModal';
+import BookingDetailsModal from '../modals/BookingDetailsModal';
+import CancelBookingModal from '../modals/CancelBookingModal';
 import RoleRestricted from '../ui/RoleRestricted';
 import { formatDate, formatDateShort } from '../../utils/helpers';
 import { useVhAccess } from '../../utils/roleAccess';
@@ -21,6 +23,7 @@ const TABS = [
   { key:'Pending',   label:'Pending',    badgeType:'warn' },
   { key:'Forwarded', label:'Forwarded',  badgeType:'warn' },
   { key:'Confirmed', label:'Confirmed' },
+  { key:'CancellationRequested', label:'Cancellation Requested', badgeType:'warn' },
   { key:'CheckedIn', label:'Checked In' },
   { key:'CheckedOut',label:'Checked Out' },
   { key:'Cancelled', label:'Cancelled' },
@@ -35,6 +38,9 @@ export default function Bookings() {
   const checkinModal = useModal();
   const checkoutModal= useModal();
   const newModal     = useModal();
+  const editModal    = useModal();
+  const detailsModal = useModal();
+  const cancelModal  = useModal();
 
   const [tab,    setTab]    = useState('all');
   const [search, setSearch] = useState('');
@@ -121,11 +127,17 @@ export default function Bookings() {
                       onConfirm={() => confirmModal.open(b)}
                       onCheckin={() => checkinModal.open(b)}
                       onCheckout={() => checkoutModal.open(b)}
+                      onEdit={() => editModal.open(b)}
+                      onView={() => detailsModal.open(b)}
+                      onRequestCancel={() => cancelModal.open(b)}
                       canForward={access.canForwardBooking}
+                      canRejectPending={access.canRejectPendingBooking}
                       canCancel={access.canCancelBooking}
+                      canApproveCancellation={access.canApproveCancellation}
                       canApprove={access.canApproveBooking}
                       canReject={access.canRejectBooking}
                       canCheckinCheckout={access.canCheckinCheckout}
+                      canEditPendingOwn={access.canModifyOwnPendingBooking}
                       onForward={() => {
                         if (!access.canForwardBooking) return;
                         dispatch({ type:'FORWARD_BOOKING', id:b.id });
@@ -136,10 +148,10 @@ export default function Bookings() {
                         dispatch({ type:'REJECT_BOOKING', id:b.id });
                         toast.info(`${b.id} rejected`);
                       }}
-                      onCancel={() => {
-                        if (!access.canCancelBooking) return;
-                        dispatch({ type:'CANCEL_BOOKING', id:b.id });
-                        toast.warn(`${b.id} cancelled`);
+                      onApproveCancellation={() => {
+                        if (!access.canApproveCancellation) return;
+                        dispatch({ type:'APPROVE_CANCELLATION', id:b.id });
+                        toast.success(`${b.id} cancellation approved`);
                       }}
                     />
                   ))}
@@ -152,6 +164,28 @@ export default function Bookings() {
 
       {access.canCreateBooking && (
         <BookingFormModal isOpen={newModal.isOpen} onClose={newModal.close} />
+      )}
+      {access.canModifyOwnPendingBooking && (
+        <BookingFormModal
+          isOpen={editModal.isOpen}
+          onClose={editModal.close}
+          mode="edit"
+          initialData={editModal.data}
+        />
+      )}
+      {access.canViewBookings && (
+        <BookingDetailsModal
+          isOpen={detailsModal.isOpen}
+          onClose={detailsModal.close}
+          booking={detailsModal.data}
+        />
+      )}
+      {access.canCancelBooking && (
+        <CancelBookingModal
+          isOpen={cancelModal.isOpen}
+          onClose={cancelModal.close}
+          booking={cancelModal.data}
+        />
       )}
       {access.canApproveBooking && (
         <ConfirmBookingModal isOpen={confirmModal.isOpen} onClose={confirmModal.close} booking={confirmModal.data} />
@@ -171,20 +205,33 @@ function BookingRow({
   onConfirm,
   onCheckin,
   onCheckout,
+  onEdit,
+  onView,
+  onRequestCancel,
+  onApproveCancellation,
   onForward,
   onReject,
-  onCancel,
   canForward,
   canCancel,
+  canRejectPending,
+  canApproveCancellation,
   canApprove,
   canReject,
   canCheckinCheckout,
+  canEditPendingOwn,
 }) {
   return (
     <tr>
       <td><div className="td-mono">{b.id}</div></td>
       <td>
-        <div className="td-main">{b.visitor}</div>
+        <div className="td-main">
+          {b.visitor}
+          {b.isOffline && (
+            <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 6px', borderRadius: 4, background: '#ffd700', color: '#000', fontWeight: 500, whiteSpace: 'nowrap' }}>
+              OFFLINE
+            </span>
+          )}
+        </div>
         <div className="td-sub">{b.org}</div>
       </td>
       <td>
@@ -198,24 +245,36 @@ function BookingRow({
       <td><Badge status={b.status} /></td>
       <td>
         <div className="flex gap-4">
+          <button className="btn btn-sm" onClick={onView}>View</button>
           {b.status === 'Pending' && (
             <>
+              {canEditPendingOwn && <button className="btn btn-sm" onClick={onEdit}>Edit</button>}
+              {canCancel && <button className="btn btn-sm btn-danger" onClick={onRequestCancel}>Request Cancel</button>}
               {canForward && <button className="btn btn-sm" onClick={onForward}>Forward</button>}
-              {canCancel && <button className="btn btn-sm btn-danger" onClick={onCancel}>Cancel</button>}
-              {!canForward && !canCancel && <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
+              {canRejectPending && <button className="btn btn-sm btn-danger" onClick={onReject}>Reject</button>}
+              {!canEditPendingOwn && !canForward && !canRejectPending && !canCancel && <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
             </>
           )}
           {b.status === 'Forwarded' && (
             <>
+              {canCancel && <button className="btn btn-sm btn-danger" onClick={onRequestCancel}>Request Cancel</button>}
               {canApprove && <button className="btn btn-sm btn-success" onClick={onConfirm}>Confirm</button>}
               {canReject && <button className="btn btn-sm btn-danger" onClick={onReject}>Reject</button>}
               {!canApprove && !canReject && <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
             </>
           )}
           {b.status === 'Confirmed' && (
-            canCheckinCheckout
-              ? <button className="btn btn-sm btn-success" onClick={onCheckin}>Check In</button>
-              : <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>
+            <>
+              {canCancel && <button className="btn btn-sm btn-danger" onClick={onRequestCancel}>Request Cancel</button>}
+              {canCheckinCheckout
+                ? <button className="btn btn-sm btn-success" onClick={onCheckin}>Check In</button>
+                : <span style={{ fontSize:11, color:'var(--ink-300)' }}>—</span>}
+            </>
+          )}
+          {b.status === 'CancellationRequested' && (
+            canApproveCancellation
+              ? <button className="btn btn-sm btn-danger" onClick={onApproveCancellation}>Approve Cancellation</button>
+              : <span style={{ fontSize:11, color:'var(--ink-300)' }}>Awaiting caretaker approval</span>
           )}
           {b.status === 'CheckedIn' && (
             canCheckinCheckout
